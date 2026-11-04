@@ -10,7 +10,7 @@ PAX answers strictly from a locked knowledge pack of public information about th
 
 > "Only what the work needs. A client never has to tidy their computer or fear embarrassment before we arrive."
 
-Anything outside the pack, PAX says so plainly and walks the visitor to the EXPLORE MY DREAM questionnaire — seven questions in the visitor's own words, where nothing typed is saved until they choose to send it. He never invents an answer, never names a price, a platform, or a phone number.
+Anything outside the pack, PAX says so plainly and walks the visitor to the EXPLORE MY DREAM questionnaire — seven questions in the visitor's own words. Nothing typed is sent while they answer; when the visitor chooses Finish, the answers are emailed to the business through a small private middleman in the founder's own Google account — no third-party form service touches them. He never invents an answer, never names a price, a platform, or a phone number.
 
 ## The demo journey (seven beats)
 
@@ -26,16 +26,24 @@ The wider 21-answer pack sits behind those seven beats, ready for the visitor's 
 
 Colour carries emotion: calm cyan at rest, warm amber while listening, with distinct colours per answer and rainbow reserved for a celebration moment only.
 
+## Talk to PAX — the live conversation
+
+A visitor can also simply talk with PAX. Beside the scripted journey sits a live conversation: the visitor taps "Talk to PAX," and PAX welcomes them, softly asks their name first, and only then introduces himself — greeting them by name. From there the conversation is open: questions and follow-ups in the visitor's own words, answered in a live voice, with captions as he speaks.
+
+The live conversation is powered by Gemini, grounded in the business's own published web copy — the same public material the scripted pack was built from. PAX is creative in expression and safe in substance: he invents no prices, timelines, promises, clients, or contact details. Anything outside the copy routes the visitor to the questionnaire, or to the team at care@missioninformatics.ca, with a reply within one business day.
+
+The page itself holds no API key and no secret. A small private middleman in the founder's own Google account holds the key and hands the page a short-lived, single-session token whose session settings — model, voice, and grounding — are locked on the server side before the conversation begins. If a live session cannot start, the page says so plainly and the scripted journey carries on exactly as before.
+
 ## Running the demo
 
-Open `index.html` in any browser — no server, no dependencies. The submitted build is a single self-contained file: PAX's recorded voice lines and the display font are embedded, so the demo runs exactly as published, anywhere. The same build is live at https://muse.ai/s/pax-demo-xyt6n9xshsnxei/NgtCQA7pz5GUwx2fQwDLerkJfsv7aInJuOj5kf8hhmY
+Open `index.html` in any browser — no server, no dependencies. The submitted build is a single self-contained file: PAX's recorded voice lines and the display font are embedded, so the scripted journey runs exactly as published, anywhere; the live conversation and the questionnaire send connect through the middleman when a visitor chooses them. The same build is live at https://muse.ai/s/pax-demo-xyt6n9xshsnxei/NgtCQA7pz5GUwx2fQwDLerkJfsv7aInJuOj5kf8hhmY
 
 Click PAX to begin. PAX's lines play as recorded audio in a real human voice; the browser's own speech is only a fallback if a recording cannot play.
 
 ## Modes
 
-- **MOCK mode (default, and the submitted build):** no API key, no cost, no network calls to any model. The scripted questions return their scripted answers word for word; anything else returns the fallback. The `API_KEY` field in the code is intentionally empty — no key is used or shipped in this demo.
-- A live, dynamically-answering version is a post-submission direction, not part of this build.
+- **The scripted journey** — the seven beats and the wider 21-answer pack run entirely from this one file: no API key, no cost, no network call. Questions return their scripted answers word for word; anything else returns the fallback. The `API_KEY` field in the code is intentionally empty — no key is used or shipped in this demo.
+- **Talk to PAX** — an optional live conversation beside the scripted journey, powered by Gemini through the private middleman described above. The scripted journey remains the skeleton; the live layer never replaces it.
 
 ## One setting to know
 

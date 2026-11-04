@@ -58,6 +58,14 @@
     border:1px solid #33505c;background:#0e161c;color:var(--text)}
   form button,.qbtn{font-family:inherit;font-size:15px;padding:11px 18px;border-radius:8px;
     border:1px solid var(--cyan);background:transparent;color:var(--cyan);cursor:pointer}
+  .liveRow{display:flex;gap:10px;justify-content:center;margin-top:16px}
+  .liveBtn{font-family:inherit;font-size:15px;padding:11px 18px;border-radius:8px;
+    border:1px solid var(--cyan);background:rgba(55,213,232,.08);color:var(--cyan);cursor:pointer}
+  .liveBtn:hover{background:rgba(55,213,232,.16)}
+  .liveBtn.end{border-color:var(--amber);color:var(--amber);background:rgba(242,178,92,.08)}
+  .liveBtn.end:hover{background:rgba(242,178,92,.16)}
+  .liveBtn:disabled{opacity:.55;cursor:default}
+  #caption.live #captionText{white-space:pre-wrap;text-align:left;font-size:17px}
   .row{display:flex;gap:14px;align-items:center;justify-content:center;margin-top:14px;font-size:14px;color:var(--muted)}
   .row label{cursor:pointer}
   /* Questionnaire walk-in */
@@ -108,6 +116,10 @@
       <button type="submit">Ask</button>
     </form>
     <div id="voiceHint" hidden style="font-size:12.5px;color:#93a1ad;text-align:center">On iPhone, use your keyboard's microphone to ask by voice.</div>
+    <div class="liveRow">
+      <button type="button" id="talkBtn" class="liveBtn">Talk to PAX — live conversation</button>
+      <button type="button" id="endTalkBtn" class="liveBtn end" hidden>End conversation</button>
+    </div>
     <div class="row">
       <label><input type="checkbox" id="soundToggle" checked> Greeting sound</label>
       <label><input type="checkbox" id="voiceToggle" checked> PAX voice</label>
@@ -118,7 +130,7 @@
     <h2>EXPLORE MY DREAM</h2>
     <p class="q" id="dreamQ">Question 1 of 7 — Tell us your dream — not just the problem. What are you building, and what does it look like when it is working the way you pictured it?</p>
     <textarea id="dreamText" aria-label="Tell us your dream — not just the problem"></textarea>
-    <p class="note">Nothing you type is saved until you choose to send it. This demo does not send or store anything.</p>
+    <p class="note">Nothing is sent while you type. When you press Finish on the last question, your seven answers are sent to the Mission Informatics team, and a person replies within one business day.</p>
     <button class="qbtn" id="dreamDone" type="button">Continue</button>
   </section>
 </main>
@@ -132,7 +144,7 @@ const CONFIG = {
   API_KEY: "",             // Intentionally empty — no key is used or shipped in this demo.
   MODEL: "",               // Intentionally unset in the public demo.
   REPLY_PROMISE: "within one business day",  // Beat 5 fallback promise — the exact wording lives here, in this one place only.
-  FORM_ENDPOINT: "https://formsubmit.co/ajax/sales@missioninformatics.ca"  // Questionnaire answers are emailed to sales@ via this form endpoint.
+  FORM_ENDPOINT: "https://script.google.com/macros/s/AKfycbxksGY-i7OeykGd_HsZUCOuXis6R5rLeaghw3-XE0BIuMosiimqBAob8q949IyEfjHLYA/exec"  // Private middleman: questionnaire answers are emailed to the MI team through it, and it mints the short-lived token for the live conversation. No API key ever reaches this page.
 };
 
 /* ============ Scripted beats — VERBATIM from PAX Demo Script v1 ============ */
@@ -220,7 +232,7 @@ function greetingSound(){
 
 /* PAX voice: each scripted line is pre-recorded in a real recorded voice (the browser's
    built-in speech sounded too robotic). The recordings ship with the demo as
-   plain audio files — no API key, no cost, no network call made by this page.
+   plain audio files embedded in this page — no API key, no cost, nothing to fetch.
    Beat 5's recording matches the current REPLY_PROMISE wording; if that wording is ever
    changed in CONFIG, Beat 5 falls back to the browser voice below until it is re-recorded,
    so the spoken line never contradicts the caption. */
@@ -360,6 +372,7 @@ document.getElementById('ask').addEventListener('submit', (e) => {
   const val = input.value.trim();
   if (!val) return;
   input.value = '';
+  if (live.active) { liveSendText(val); return; }   // while a live conversation is on, the message box talks to live PAX
   answerBeat(routeFreeText(val));
 });
 
@@ -390,19 +403,21 @@ document.getElementById('dreamDone').addEventListener('click', () => {
   }
   sendDreamAnswers();
 });
-/* The questionnaire is live: on Finish, the seven answers go to the form endpoint,
-   which emails them to sales@missioninformatics.ca. The panel closes and the close
-   line plays only after the send succeeds; if the send fails, the visitor keeps
-   their answers and is asked to press Finish once more. */
+/* The questionnaire is live: on Finish, the seven answers go to the middleman
+   endpoint, which emails them to the Mission Informatics team. The panel closes
+   and the close line plays only after the send succeeds; if the send fails, the
+   visitor keeps their answers and is asked to press Finish once more. The send
+   uses Content-Type text/plain so the browser sends it as a simple request. */
 let dreamSending = false;
 function sendDreamAnswers(){
   if (dreamSending) return;
   dreamSending = true;
   const doneBtn = document.getElementById('dreamDone');
   doneBtn.disabled = true;
-  const payload = { _subject: 'PAX \u2014 EXPLORE MY DREAM questionnaire answers', _template: 'table', _captcha: 'false' };
-  DREAM_QUESTIONS.forEach((q, i) => { payload['Q' + (i + 1) + '. ' + q] = dreamAnswers[i] || ''; });
-  fetch(CONFIG.FORM_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(payload) })
+  const answers = {};
+  DREAM_QUESTIONS.forEach((q, i) => { answers['Q' + (i + 1) + '. ' + q] = dreamAnswers[i] || ''; });
+  const payload = { action: 'send', answers: answers };
+  fetch(CONFIG.FORM_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) })
     .then(r => {
       if (!r.ok) throw new Error('send failed');
       dreamSending = false; doneBtn.disabled = false;
@@ -420,8 +435,8 @@ function sendDreamAnswers(){
 /* Voice in: the visitor may speak a question instead of typing. Turn by turn, never
    overlapping PAX: his line stops, the line turns amber (listening), and when the
    words land they go through the same routing as typed text. Uses the browser's
-   built-in speech recognition where it exists — no key, no cost, no network call
-   made by this page. The button simply never appears where the browser lacks it. */
+   built-in speech recognition where it exists — no key, no cost. The button
+   simply never appears where the browser lacks it. */
 (function(){
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const btn = document.getElementById('micBtn');
@@ -457,6 +472,338 @@ function sendDreamAnswers(){
     try { rec.start(); } catch (e) { listening = false; label.textContent = 'Speak'; }
   });
 })();
+
+/* ============ Talk to PAX — a live conversation, alongside the scripted journey ============
+   The visitor talks (or types); PAX answers live in Gemini's voice. The page holds
+   no API key: the middleman mints a short-lived, single-session token with every
+   session setting already locked in, and the browser presents only that token.
+   If anything fails along the way, the visitor is told plainly and left in the
+   scripted journey, fully usable. */
+const live = {
+  active: false, starting: false,
+  ws: null, stream: null, micCtx: null, micNode: null, micSource: null,
+  playCtx: null, nextTime: 0, sources: [], speakTimer: null,
+  playQueue: [], playBuffered: 0, playing: false, inReply: false,
+  kickoffSent: false,   // PAX speaks first: the greeting kickoff goes out once per session, on setupComplete
+  turns: []   // transcript, in page order: { who: 'you' | 'pax', text: '' }
+};
+const talkBtn = document.getElementById('talkBtn');
+const endTalkBtn = document.getElementById('endTalkBtn');
+const captionBox = document.getElementById('caption');
+
+function liveRenderCaption(){
+  captionText.textContent = live.turns
+    .map(t => (t.who === 'you' ? 'You: ' : 'PAX: ') + t.text)
+    .join('\n');
+}
+function liveAppendTranscript(who, text){
+  if (!text) return;
+  const last = live.turns[live.turns.length - 1];
+  if (last && last.who === who) last.text += text;
+  else live.turns.push({ who: who, text: text });
+  liveRenderCaption();
+}
+function liveShowNote(text){
+  captionBox.classList.remove('live');
+  captionText.textContent = text;
+}
+function liveFail(){
+  liveTeardown();
+  liveShowNote('The live conversation could not start just now. The scripted tour above still works exactly as before — you can carry on there, or try Talk to PAX again in a moment.');
+  setLine('amber');
+}
+function liveSendText(val){
+  if (!live.ws || live.ws.readyState !== WebSocket.OPEN) return;
+  liveAppendTranscript('you', val);
+  try {
+    live.ws.send(JSON.stringify({ clientContent: { turns: [{ role: 'user', parts: [{ text: val }] }], turnComplete: true } }));
+  } catch (e) { /* a dropped socket is handled by onclose below */ }
+}
+
+/* --- base64 helpers for the PCM streams --- */
+function liveB64Encode(bytes){
+  let bin = '';
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
+}
+function liveB64Decode(b64){
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+/* --- microphone: capture, downsample to 16 kHz mono PCM16, stream --- */
+function liveDownsampleTo16k(input, inRate){
+  const ratio = inRate / 16000;
+  const outLen = Math.max(1, Math.floor(input.length / ratio));
+  const out = new Int16Array(outLen);
+  for (let i = 0; i < outLen; i++) {
+    const start = Math.floor(i * ratio);
+    const end = Math.min(input.length, Math.floor((i + 1) * ratio));
+    let sum = 0, n = 0;
+    for (let j = start; j < end; j++) { sum += input[j]; n++; }
+    let s = n ? sum / n : 0;
+    s = Math.max(-1, Math.min(1, s));
+    out[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+  }
+  return out;
+}
+/* One captured frame -> downsample -> send, immediately. Nothing is batched
+   or held: the visitor's voice leaves in small chunks of about 100 ms. */
+function liveSendMicFrame(frame, inRate){
+  if (!live.kickoffSent) return;   // PAX greets first: no visitor audio is forwarded until the kickoff turn has gone out
+  if (!live.ws || live.ws.readyState !== WebSocket.OPEN) return;
+  const pcm = liveDownsampleTo16k(frame, inRate);
+  const b64 = liveB64Encode(new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength));
+  try {
+    live.ws.send(JSON.stringify({ realtimeInput: { audio: { data: b64, mimeType: 'audio/pcm;rate=16000' } } }));
+  } catch (e) { /* a dropped socket is handled by onclose below */ }
+}
+/* AudioWorklet processor: gathers the mic into ~100 ms frames and posts each
+   one the moment it is full. Written as text because this page is one file. */
+const LIVE_WORKLET_CODE = [
+  'class PaxMic extends AudioWorkletProcessor {',
+  '  constructor(){ super(); this.pending = [];',
+  '    this.target = Math.max(1024, Math.round(sampleRate * 0.1)); }',
+  '  process(inputs){',
+  '    var ch = inputs[0] && inputs[0][0];',
+  '    if (ch) {',
+  '      for (var i = 0; i < ch.length; i++) this.pending.push(ch[i]);',
+  '      while (this.pending.length >= this.target) {',
+  '        var frame = Float32Array.from(this.pending.splice(0, this.target));',
+  '        this.port.postMessage(frame, [frame.buffer]);',
+  '      }',
+  '    }',
+  '    return true;',
+  '  }',
+  '}',
+  "registerProcessor('pax-mic', PaxMic);"
+].join('\n');
+function liveUseScriptProcessor(send){
+  live.micNode = live.micCtx.createScriptProcessor(1024, 1, 1);   // smallest practical buffer size
+  live.micNode.onaudioprocess = (ev) => send(ev.inputBuffer.getChannelData(0));
+  live.micSource.connect(live.micNode);
+  live.micNode.connect(live.micCtx.destination);   // required for the processor to run; it outputs silence
+}
+function liveStartMic(){
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('no mic');
+  return navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    live.stream = stream;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    live.micCtx = new AC();
+    if (live.micCtx.state === 'suspended') live.micCtx.resume();
+    live.micSource = live.micCtx.createMediaStreamSource(stream);
+    const inRate = live.micCtx.sampleRate;
+    const send = (frame) => liveSendMicFrame(frame, inRate);
+    if (live.micCtx.audioWorklet && typeof AudioWorkletNode !== 'undefined') {
+      const url = URL.createObjectURL(new Blob([LIVE_WORKLET_CODE], { type: 'application/javascript' }));
+      return live.micCtx.audioWorklet.addModule(url).then(() => {
+        URL.revokeObjectURL(url);
+        const node = new AudioWorkletNode(live.micCtx, 'pax-mic');
+        node.port.onmessage = (ev) => send(ev.data);
+        live.micNode = node;
+        live.micSource.connect(node);   // the worklet passes no audio through; nothing to connect onward
+      }).catch(() => { try { URL.revokeObjectURL(url); } catch (e) {} liveUseScriptProcessor(send); });
+    }
+    liveUseScriptProcessor(send);
+  });
+}
+
+/* --- playback: 24 kHz PCM from PAX, buffered, then gapless ---
+   A reply is NOT played the instant its first chunk lands, and NOT held for
+   the whole reply either. Decoded chunks accumulate until about 300 ms of
+   audio is in hand; playback then starts at once and every chunk is
+   scheduled back-to-back on a running timeline cursor, so the voice plays
+   without gaps. While playing, each new chunk is scheduled the moment it
+   arrives, keeping a cushion of audio ahead of the playhead. If that cushion
+   runs dry mid-reply (an underrun), playback pauses and re-accumulates about
+   200 ms before resuming, rather than stuttering through fragments. */
+const LIVE_PLAY_START_MS = 300;    // buffer before a reply starts playing
+const LIVE_PLAY_RESUME_MS = 200;   // re-buffer after an underrun, mid-reply
+function livePlayChunk(b64){
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!live.playCtx) { live.playCtx = new AC({ sampleRate: 24000 }); live.nextTime = 0; }
+  if (live.playCtx.state === 'suspended') live.playCtx.resume();
+  const bytes = liveB64Decode(b64);
+  const samples = new Int16Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 2));
+  if (!samples.length) return;
+  const buf = live.playCtx.createBuffer(1, samples.length, 24000);
+  const ch = buf.getChannelData(0);
+  for (let i = 0; i < samples.length; i++) ch[i] = samples[i] / 32768;
+  live.playQueue.push(buf);
+  live.playBuffered += buf.duration;
+  livePumpPlayback(false);
+}
+function livePumpPlayback(flush){
+  const ctx = live.playCtx;
+  if (!ctx) return;
+  if (live.playing && live.nextTime <= ctx.currentTime) {
+    live.playing = false;          // underrun: the playhead caught up with the cursor
+    setSpeaking(false);            // the pulse follows actual playback, not chunk arrival
+  }
+  if (!live.playQueue.length) return;
+  if (!live.playing) {
+    const need = flush ? 0 : (live.inReply ? LIVE_PLAY_RESUME_MS : LIVE_PLAY_START_MS) / 1000;
+    if (live.playBuffered < need) return;   // still accumulating — hold, do not play fragments
+    live.playing = true;
+    live.inReply = true;
+    live.nextTime = ctx.currentTime + 0.05;
+  }
+  // Schedule everything in hand back-to-back on the timeline cursor.
+  while (live.playQueue.length) {
+    const buf = live.playQueue.shift();
+    live.playBuffered -= buf.duration;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(live.nextTime);
+    live.nextTime += buf.duration;
+    live.sources.push(src);
+    src.onended = () => { live.sources = live.sources.filter(s => s !== src); };
+  }
+  setSpeaking(true);   // audio is actually playing now — the alive line pulses
+  liveArmDrainTimer();
+}
+function liveArmDrainTimer(){
+  if (live.speakTimer) clearTimeout(live.speakTimer);
+  if (!live.playCtx) { live.speakTimer = null; return; }
+  live.speakTimer = setTimeout(liveCheckDrained,
+    Math.max(40, (live.nextTime - live.playCtx.currentTime) * 1000 + 60));
+}
+function liveCheckDrained(){
+  live.speakTimer = null;
+  if (!live.playCtx) return;
+  if (live.playQueue.length) return;   // re-accumulating after an underrun; the next pump re-arms
+  if (live.playCtx.currentTime >= live.nextTime - 0.03) {
+    live.playing = false;              // the reply has played out in full
+    live.inReply = false;
+    setSpeaking(false);
+  } else {
+    liveArmDrainTimer();               // a tail is still playing — check again at its end
+  }
+}
+function liveStopPlayback(){
+  live.sources.forEach(s => { try { s.stop(); } catch (e) {} });
+  live.sources = [];
+  live.playQueue = [];
+  live.playBuffered = 0;
+  live.playing = false;
+  live.inReply = false;
+  live.nextTime = 0;
+  if (live.speakTimer) { clearTimeout(live.speakTimer); live.speakTimer = null; }
+  setSpeaking(false);
+}
+
+function liveHandleMessage(msg){
+  // PAX speaks first. The moment the server confirms the session is ready
+  // (setupComplete), send ONE kickoff turn so PAX opens with its greeting and
+  // asks the visitor's first name, instead of waiting in silence for the
+  // visitor to talk. Exactly once per session — the flag is reset in
+  // liveTeardown — and the mic gate in liveSendMicFrame holds every visitor
+  // audio frame until this has gone out.
+  if (msg && msg.setupComplete && !live.kickoffSent) {
+    live.kickoffSent = true;
+    if (live.ws && live.ws.readyState === WebSocket.OPEN) {
+      try {
+        live.ws.send(JSON.stringify({ clientContent: { turns: [{ role: 'user', parts: [{ text: '(The visitor has just arrived on the page. Greet them now.)' }] }], turnComplete: true } }));
+      } catch (e) { /* a dropped socket is handled by onclose */ }
+    }
+  }
+  const sc = msg && msg.serverContent;
+  if (!sc) return;
+  if (sc.interrupted) liveStopPlayback();
+  if (sc.inputTranscription && sc.inputTranscription.text) liveAppendTranscript('you', sc.inputTranscription.text);
+  if (sc.outputTranscription && sc.outputTranscription.text) liveAppendTranscript('pax', sc.outputTranscription.text);
+  if (sc.modelTurn && sc.modelTurn.parts) {
+    sc.modelTurn.parts.forEach(part => {
+      if (part.inlineData && part.inlineData.data) livePlayChunk(part.inlineData.data);
+    });
+  }
+  // Playback normally starts the moment the buffer threshold is met, long
+  // before this; the flush only releases a reply shorter than the threshold.
+  if (sc.turnComplete) livePumpPlayback(true);
+}
+
+function liveTeardown(){
+  live.active = false; live.starting = false;
+  live.kickoffSent = false;   // the next session greets first again
+  if (live.ws) { try { live.ws.onclose = null; live.ws.close(); } catch (e) {} live.ws = null; }
+  if (live.micNode) { try { live.micNode.disconnect(); } catch (e) {} if (live.micNode.port) { try { live.micNode.port.close(); } catch (e) {} } live.micNode = null; }
+  if (live.micSource) { try { live.micSource.disconnect(); } catch (e) {} live.micSource = null; }
+  if (live.stream) { live.stream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} }); live.stream = null; }
+  if (live.micCtx) { try { live.micCtx.close(); } catch (e) {} live.micCtx = null; }
+  liveStopPlayback();
+  if (live.playCtx) { try { live.playCtx.close(); } catch (e) {} live.playCtx = null; }
+  talkBtn.hidden = false; talkBtn.disabled = false; talkBtn.textContent = 'Talk to PAX — live conversation';
+  endTalkBtn.hidden = true;
+}
+
+function startLive(){
+  if (live.active || live.starting) return;
+  live.starting = true;
+  talkBtn.disabled = true;
+  talkBtn.textContent = 'Connecting…';
+  // Stop any scripted line so the two voices never overlap.
+  if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
+  stopBeatAudio();
+  // 1. Ask the middleman for a short-lived session token. No API key is involved.
+  fetch(CONFIG.FORM_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: '{}' })
+    .then(r => { if (!r.ok) throw new Error('token request failed'); return r.json(); })
+    .then(data => {
+      const token = data && data.token;
+      if (!token) throw new Error('no token');
+      // 2. Open the live socket with that token.
+      const ws = new WebSocket('wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=' + encodeURIComponent(token));
+      live.ws = ws;
+      let opened = false;
+      ws.onopen = () => {
+        opened = true;
+        // 3. Setup carries the model only — everything else is locked into the token.
+        try { ws.send(JSON.stringify({ setup: { model: 'models/gemini-2.5-flash-native-audio-preview-12-2025' } })); }
+        catch (e) { liveFail(); return; }
+        // 4. Then the microphone.
+        liveStartMic().then(() => {
+          if (!live.starting) { liveTeardown(); return; }   // it was called off while connecting — release the mic
+          live.active = true; live.starting = false;
+          live.turns = [];
+          captionBox.classList.add('live');
+          captionText.textContent = 'You are live with PAX. Just speak — or type in the box below.';
+          setLine('');
+          talkBtn.hidden = true;
+          endTalkBtn.hidden = false;
+        }).catch(() => liveFail());
+      };
+      ws.onmessage = (ev) => {
+        const handle = (text) => { try { liveHandleMessage(JSON.parse(text)); } catch (e) {} };
+        if (typeof ev.data === 'string') handle(ev.data);
+        else if (ev.data && typeof ev.data.text === 'function') ev.data.text().then(handle).catch(() => {});
+      };
+      ws.onerror = () => { /* onclose follows and handles the state */ };
+      ws.onclose = () => {
+        const wasLive = live.active;
+        const wasStarting = live.starting;
+        liveTeardown();
+        captionBox.classList.remove('live');
+        if (wasLive) {
+          liveShowNote('The live conversation has ended. The scripted tour above is still here whenever you are ready.');
+        } else if (!opened || wasStarting) {
+          liveShowNote('The live conversation could not start just now. The scripted tour above still works exactly as before — you can carry on there, or try Talk to PAX again in a moment.');
+          setLine('amber');
+        }
+      };
+    })
+    .catch(() => liveFail());
+}
+
+talkBtn.addEventListener('click', startLive);
+endTalkBtn.addEventListener('click', () => {
+  liveTeardown();
+  liveShowNote('The live conversation has ended. The scripted tour above is still here whenever you are ready.');
+});
 </script>
 </body>
 </html>
