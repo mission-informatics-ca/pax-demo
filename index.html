@@ -318,8 +318,8 @@ function answerBeat(beat){
     dream.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
-  const BEAT_LINE = { 2: 'sky', 3: 'teal', 4: 'green', 5: 'amber', 8: 'sky', 9: 'gold', 10: 'sky', 11: 'green',
-    12: 'green', 13: 'violet', 14: 'sky', 15: 'amber', 16: 'teal', 17: 'teal', 18: 'sky', 19: 'violet', 20: 'green', 21: 'teal' };
+  const BEAT_LINE = { 1: 'green', 2: 'sky', 3: 'teal', 4: 'green', 5: 'amber', 8: 'sky', 9: 'gold', 10: 'sky', 11: 'green',
+    12: 'green', 13: 'violet', 14: 'sky', 15: 'amber', 16: 'teal', 17: 'teal', 18: 'sky', 19: 'violet', 20: 'green', 21: 'teal', 7: 'gold' };
   speak(BEATS[beat], BEAT_LINE[beat] || '', beat);
 }
 
@@ -332,7 +332,6 @@ function routeFreeText(raw){
   if (/who are you|your name|what are you\b|what is pax|who is pax/.test(t)) return 11;
   if (/are you.*(robot|\bai\b|bot|real|human)|\brobot\b|chatbot/.test(t)) return 20;
   if (/(what|who).*(mission informatics|mi ).*(do|is)|what do you do/.test(t)) return 2;
-  if (/how.*(start|begin|work|engage)|get started/.test(t)) return 3;
   if (/computer|access|look at|privacy|private|tidy|embarrass|judg|sanitize/.test(t)) return 4;
   if (/price|pricing|cost|how much|quote|\bfee\b|charge/.test(t)) return 9;
   if (/who (do|does|can).*(work|help|serve)|actors|public figures|entrepreneurs|who is this for|your clients/.test(t)) return 10;
@@ -345,6 +344,7 @@ function routeFreeText(raw){
   if (/y brief|\bnews\b/.test(t)) return 19;
   if (/whatsapp|text (you|me|him)|message you/.test(t)) return 21;
   if (/web ?design|website|video|photograph|photo|branding|\bbrand\b|logo|coach|services?\b|offer|what (can|do) you do|can you help|social|graphic|content|merch|marketing/.test(t)) return 8;
+  if (/how.*(start|begin|work|engage)|get started/.test(t)) return 3;
   if (/talk|speak|call|book|appointment|contact|human|real person/.test(t)) return 6;
   if (/dream|questionnaire/.test(t)) return 6;
   if (/goodbye|bye\b|that'?s all|see you/.test(t)) return 7;
