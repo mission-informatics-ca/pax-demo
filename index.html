@@ -66,6 +66,11 @@
   .liveBtn.end:hover{background:rgba(242,178,92,.16)}
   .liveBtn:disabled{opacity:.55;cursor:default}
   #caption.live #captionText{white-space:pre-wrap;text-align:left;font-size:17px}
+  /* Sound safety net: same panel treatment as the caption, smaller, tappable */
+  #soundTap{width:100%;margin-top:10px;background:var(--panel);border:1px solid #22313a;
+    border-radius:10px;padding:14px 20px;font-size:16px;line-height:1.5;text-align:center;
+    color:var(--cyan);cursor:pointer}
+  #soundTap:focus-visible{outline:2px solid var(--cyan);outline-offset:4px}
   .row{display:flex;gap:14px;align-items:center;justify-content:center;margin-top:14px;font-size:14px;color:var(--muted)}
   .row label{cursor:pointer}
   /* Questionnaire walk-in */
@@ -98,6 +103,7 @@
     <span class="who">PAX</span>
     <span id="captionText"></span>
   </div>
+  <div id="soundTap" hidden role="button" tabindex="0">Tap here for sound</div>
 
   <div class="controls" id="controls" hidden>
     <div class="chips">
@@ -490,6 +496,7 @@ const live = {
 const talkBtn = document.getElementById('talkBtn');
 const endTalkBtn = document.getElementById('endTalkBtn');
 const captionBox = document.getElementById('caption');
+const soundTapEl = document.getElementById('soundTap');
 
 function liveRenderCaption(){
   captionText.textContent = live.turns
@@ -506,6 +513,49 @@ function liveAppendTranscript(who, text){
 function liveShowNote(text){
   captionBox.classList.remove('live');
   captionText.textContent = text;
+}
+/* --- sound safety net ---
+   If the playback context is STILL suspended when PAX's audio arrives —
+   the unlock inside the tap did not take on this browser — offer one
+   clear tap that grants sound, then get out of the way once it flows. */
+function liveShowSoundTap(){
+  if (!live.active && !live.starting) return;
+  if (soundTapEl) soundTapEl.hidden = false;
+}
+function liveHideSoundTap(){
+  if (soundTapEl) soundTapEl.hidden = true;
+}
+/* Check the playback context at a moment that matters (a chunk arriving,
+   a reply about to be scheduled): resume it if suspended, and if it
+   refuses to run, raise the tap-for-sound net. */
+function liveCheckSoundState(){
+  const ctx = live.playCtx;
+  if (!ctx) return;
+  if (ctx.state !== 'suspended') { liveHideSoundTap(); return; }
+  let p = null;
+  try { p = ctx.resume(); } catch (e) {}
+  const settled = () => {
+    if (live.playCtx !== ctx) return;
+    if (ctx.state === 'suspended') liveShowSoundTap(); else liveHideSoundTap();
+  };
+  if (p && typeof p.then === 'function') p.then(settled).catch(() => liveShowSoundTap());
+  else settled();
+}
+if (soundTapEl) {
+  const unlockFromTap = () => {
+    const ctx = live.playCtx;
+    if (!ctx) { liveHideSoundTap(); return; }
+    let p = null;
+    try { p = ctx.resume(); } catch (e) {}   // this tap is a fresh gesture: iOS grants sound now
+    livePumpPlayback(true);                  // play what is buffered
+    const done = () => { if (ctx.state === 'running') liveHideSoundTap(); };
+    if (p && typeof p.then === 'function') p.then(done).catch(() => {});
+    else done();
+  };
+  soundTapEl.addEventListener('click', unlockFromTap);
+  soundTapEl.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); unlockFromTap(); }
+  });
 }
 function liveFail(){
   liveTeardown();
@@ -594,7 +644,7 @@ function liveStartMic(){
   return navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
     live.stream = stream;
     const AC = window.AudioContext || window.webkitAudioContext;
-    live.micCtx = new AC();
+    if (!live.micCtx) live.micCtx = new AC();   // normally already created inside the Talk tap, so the platform already trusts it
     if (live.micCtx.state === 'suspended') live.micCtx.resume();
     live.micSource = live.micCtx.createMediaStreamSource(stream);
     const inRate = live.micCtx.sampleRate;
@@ -627,7 +677,7 @@ const LIVE_PLAY_RESUME_MS = 200;   // re-buffer after an underrun, mid-reply
 function livePlayChunk(b64){
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!live.playCtx) { live.playCtx = new AC({ sampleRate: 24000 }); live.nextTime = 0; }
-  if (live.playCtx.state === 'suspended') live.playCtx.resume();
+  liveCheckSoundState();   // a chunk is arriving: if the context has been suspended, ask for sound again right now
   const bytes = liveB64Decode(b64);
   const samples = new Int16Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 2));
   if (!samples.length) return;
@@ -653,6 +703,10 @@ function livePumpPlayback(flush){
     live.inReply = true;
     live.nextTime = ctx.currentTime + 0.05;
   }
+  // Scheduling is about to put audible audio on the timeline — the first
+  // chunks of a reply included. One more state check at exactly this
+  // moment: resume again if suspended, raise the tap net if it refuses.
+  liveCheckSoundState();
   // Schedule everything in hand back-to-back on the timeline cursor.
   while (live.playQueue.length) {
     const buf = live.playQueue.shift();
@@ -737,6 +791,7 @@ function liveTeardown(){
   if (live.stream) { live.stream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} }); live.stream = null; }
   if (live.micCtx) { try { live.micCtx.close(); } catch (e) {} live.micCtx = null; }
   liveStopPlayback();
+  liveHideSoundTap();
   if (live.playCtx) { try { live.playCtx.close(); } catch (e) {} live.playCtx = null; }
   talkBtn.hidden = false; talkBtn.disabled = false; talkBtn.textContent = 'Talk to PAX — live conversation';
   endTalkBtn.hidden = true;
@@ -750,6 +805,30 @@ function startLive(){
   // Stop any scripted line so the two voices never overlap.
   if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
   stopBeatAudio();
+  // 0. Unlock sound NOW — synchronously, inside this tap, before any await.
+  //    iOS Safari grants an AudioContext permission to make sound only when
+  //    it is created and resumed within the visitor's own tap. A playback
+  //    context born later — after the token fetch, the socket, the mic
+  //    prompt — can sit suspended forever while chunks schedule onto a
+  //    frozen timeline: PAX "speaks" in total silence. So both contexts
+  //    are created and resumed here, and kept for the whole session: this
+  //    one playback context is reused for every chunk that gets scheduled.
+  const AC = window.AudioContext || window.webkitAudioContext;
+  try {
+    if (AC) {
+      if (!live.playCtx) { live.playCtx = new AC({ sampleRate: 24000 }); live.nextTime = 0; }
+      if (live.playCtx.state === 'suspended') live.playCtx.resume();
+      // A one-sample silent buffer played inside the tap completes the iOS unlock.
+      const unlockSrc = live.playCtx.createBufferSource();
+      unlockSrc.buffer = live.playCtx.createBuffer(1, 1, live.playCtx.sampleRate);
+      unlockSrc.connect(live.playCtx.destination);
+      unlockSrc.start(0);
+      // The microphone capture context gets the same in-gesture unlock.
+      if (!live.micCtx) live.micCtx = new AC();
+      if (live.micCtx.state === 'suspended') live.micCtx.resume();
+    }
+  } catch (e) { /* if even this fails, the tap-for-sound net below is the fallback */ }
+  liveHideSoundTap();
   // 1. Ask the middleman for a short-lived session token. No API key is involved.
   fetch(CONFIG.FORM_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: '{}' })
     .then(r => { if (!r.ok) throw new Error('token request failed'); return r.json(); })
