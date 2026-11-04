@@ -123,15 +123,16 @@
   </section>
 </main>
 
-<footer>Demo — mock mode. No answers leave this page. Voice: PAX speaks in a recorded voice for this demo; captions always on.</footer>
+<footer>Demo — PAX’s answers are scripted; the questionnaire is live, and its answers go to the Mission Informatics team. Voice: PAX speaks in a recorded voice for this demo; captions always on.</footer>
 
 <script>
 /* ============ CONFIG — the one place settings live ============ */
 const CONFIG = {
-  MODE: "MOCK",            // Demo mode. Stays MOCK for the public demo — no network call is made.
+  MODE: "MOCK",            // Demo mode. PAX’s answers stay scripted; the questionnaire below is live and sends its answers to the team.
   API_KEY: "",             // Intentionally empty — no key is used or shipped in this demo.
   MODEL: "",               // Intentionally unset in the public demo.
-  REPLY_PROMISE: "within one business day"  // Beat 5 fallback promise — the exact wording lives here, in this one place only.
+  REPLY_PROMISE: "within one business day",  // Beat 5 fallback promise — the exact wording lives here, in this one place only.
+  FORM_ENDPOINT: "https://formsubmit.co/ajax/sales@missioninformatics.ca"  // Questionnaire answers are emailed to sales@ via this form endpoint.
 };
 
 /* ============ Scripted beats — VERBATIM from PAX Demo Script v1 ============ */
@@ -368,6 +369,7 @@ const CLOSE_LINE = "Thank you for stopping by \u2014 we have your answers, and w
 
 /* Walk-in state: Continue steps through all seven questions, then the close. */
 let dreamStep = 0;
+const dreamAnswers = {};
 const dreamQ = document.getElementById('dreamQ');
 const dreamText = document.getElementById('dreamText');
 function showDreamQuestion(){
@@ -378,6 +380,7 @@ function showDreamQuestion(){
     (dreamStep === DREAM_QUESTIONS.length - 1) ? 'Finish' : 'Continue';
 }
 document.getElementById('dreamDone').addEventListener('click', () => {
+  dreamAnswers[dreamStep] = dreamText.value;
   if (dreamStep < DREAM_QUESTIONS.length - 1) {
     dreamStep++;
     showDreamQuestion();
@@ -385,10 +388,34 @@ document.getElementById('dreamDone').addEventListener('click', () => {
     dream.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
-  dream.style.display = 'none';
-  dreamStep = 0;
-  speak(CLOSE_LINE, 'gold', 'close');
+  sendDreamAnswers();
 });
+/* The questionnaire is live: on Finish, the seven answers go to the form endpoint,
+   which emails them to sales@missioninformatics.ca. The panel closes and the close
+   line plays only after the send succeeds; if the send fails, the visitor keeps
+   their answers and is asked to press Finish once more. */
+let dreamSending = false;
+function sendDreamAnswers(){
+  if (dreamSending) return;
+  dreamSending = true;
+  const doneBtn = document.getElementById('dreamDone');
+  doneBtn.disabled = true;
+  const payload = { _subject: 'PAX \u2014 EXPLORE MY DREAM questionnaire answers', _template: 'table', _captcha: 'false' };
+  DREAM_QUESTIONS.forEach((q, i) => { payload['Q' + (i + 1) + '. ' + q] = dreamAnswers[i] || ''; });
+  fetch(CONFIG.FORM_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(payload) })
+    .then(r => {
+      if (!r.ok) throw new Error('send failed');
+      dreamSending = false; doneBtn.disabled = false;
+      dream.style.display = 'none'; dreamStep = 0;
+      speak(CLOSE_LINE, 'gold', 'close');
+    })
+    .catch(() => {
+      dreamSending = false; doneBtn.disabled = false;
+      captionText.textContent = 'Thank you for stopping by \u2014 the send was interrupted just now. Your answers are still here; please press Finish once more.';
+      setLine('amber');
+    });
+}
+
 
 /* Voice in: the visitor may speak a question instead of typing. Turn by turn, never
    overlapping PAX: his line stops, the line turns amber (listening), and when the
