@@ -18,7 +18,7 @@ PAX was built by a founder who is not a developer, directing an AI teammate. The
 
 - PAX speaks in a real recorded human voice; the browser's built-in speech is only a fallback if a recording cannot play.
 - Captions are always on.
-- A Speak button uses the browser's speech recognition where available (turn-by-turn, so replies play as single uninterrupted takes). On iPhone Safari, which offers web pages no recognition hook, the demo shows a keyboard-microphone hint instead of pretending the button works.
+- Questions are typed into the Ask box (turn-by-turn, so replies play as single uninterrupted takes); spoken conversation lives in the Talk to PAX live layer.
 - Colour carries emotion: calm cyan at rest, warm amber while listening, distinct colours per answer, slow breathing at rest and a pulse while speaking. Rainbow is reserved for one celebration moment.
 
 ## Testing

@@ -115,13 +115,8 @@
     <form id="ask">
       <input id="askText" type="text" autocomplete="off"
         placeholder="Ask PAX anything…" aria-label="Ask PAX anything">
-      <button type="button" id="micBtn" aria-label="Ask PAX by voice" hidden>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
-        <span id="micLabel">Speak</span>
-      </button>
       <button type="submit">Ask</button>
     </form>
-    <div id="voiceHint" hidden style="font-size:12.5px;color:#93a1ad;text-align:center">On iPhone, use your keyboard's microphone to ask by voice.</div>
     <div class="liveRow">
       <button type="button" id="talkBtn" class="liveBtn">Talk to PAX — live conversation</button>
       <button type="button" id="endTalkBtn" class="liveBtn end" hidden>End conversation</button>
@@ -437,47 +432,6 @@ function sendDreamAnswers(){
     });
 }
 
-
-/* Voice in: the visitor may speak a question instead of typing. Turn by turn, never
-   overlapping PAX: his line stops, the line turns amber (listening), and when the
-   words land they go through the same routing as typed text. Uses the browser's
-   built-in speech recognition where it exists — no key, no cost. The button
-   simply never appears where the browser lacks it. */
-(function(){
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const btn = document.getElementById('micBtn');
-  const label = document.getElementById('micLabel');
-  if (!btn) return;
-  if (!SR) {
-    /* No in-page speech recognition in this browser (e.g. Safari): the button stays
-       hidden rather than broken, and the visitor gets the keyboard-dictation hint. */
-    const hint = document.getElementById('voiceHint');
-    if (hint) hint.hidden = false;
-    return;
-  }
-  btn.hidden = false;
-  let listening = false;
-  btn.addEventListener('click', () => {
-    if (listening) return;
-    let rec;
-    try { rec = new SR(); } catch (e) { return; }
-    rec.lang = 'en-CA';
-    rec.interimResults = false;
-    rec.maxAlternatives = 1;
-    listening = true;
-    label.textContent = 'Listening…';
-    if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
-    stopBeatAudio();
-    setLine('amber');
-    rec.onresult = (ev) => {
-      const heard = ev.results[0][0].transcript || '';
-      if (heard.trim()) answerBeat(routeFreeText(heard));
-    };
-    rec.onend = () => { listening = false; label.textContent = 'Speak'; };
-    rec.onerror = () => { listening = false; label.textContent = 'Speak'; };
-    try { rec.start(); } catch (e) { listening = false; label.textContent = 'Speak'; }
-  });
-})();
 
 /* ============ Talk to PAX — a live conversation, alongside the scripted journey ============
    The visitor talks (or types); PAX answers live in Gemini's voice. The page holds

@@ -4,7 +4,7 @@ PAX — Latin for peace — is the live welcome at Mission Informatics' front do
 
 Mission Informatics is a new kind of IT service and digital creative agency in Toronto — for established actors and public figures, entrepreneurs, and small business owners. Web design, systems, video, photography, branding, and technology coaching, built as one connected system.
 
-A small business's website is its front door, and for most, nobody is home. PAX is home. He appears as a video-conference-like presence — eyes and the line between them, the line changing colour with the moment — greets the visitor with captions always on, speaks in a real recorded human voice, and takes spoken questions through a Speak button. On iPhone Safari, where in-page speech recognition is unavailable, a keyboard-microphone hint appears instead.
+A small business's website is its front door, and for most, nobody is home. PAX is home. He appears as a video-conference-like presence — eyes and the line between them, the line changing colour with the moment — greets the visitor with captions always on, speaks in a real recorded human voice, and takes typed questions through the Ask box. Visitors who would rather speak than type can open the live conversation — Talk to PAX, below.
 
 PAX answers strictly from a locked knowledge pack of public information about the business — 21 scripted answers covering what Mission Informatics does, how an engagement starts, its privacy stance, AI, apps, rescue, managed care, backups, and more.
 
